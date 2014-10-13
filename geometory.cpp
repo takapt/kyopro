@@ -795,3 +795,87 @@ int main()
         cout << res << endl;
     }
 }
+
+
+
+
+// 最小包含球, O(2^dim * n)
+#include <valarray>
+
+typedef double number;
+typedef valarray<number> point;
+const int dim = 2;
+
+number dot(const point& a, const point& b) {
+    return (a * b).sum();
+}
+point cross(const point& a, const point& b) {
+    return a.cshift(+1)*b.cshift(-1)
+        - a.cshift(-1)*b.cshift(+1);
+}
+number dist2(const point& a, const point& b) {
+    return dot(a-b, a-b);
+}
+struct min_ball {
+    point center;
+    number radius2;
+    number radius;
+    void add(const point& p) {
+        ps.push_back(p);
+    }
+    void compile() {
+        m = 0;
+        center.resize(dim, 0);
+        radius2 = -1;
+        make_ball(ps.end());
+        radius = sqrt(radius2);
+    }
+    template <class OUT>
+        void support(OUT out) {
+            copy(ps.begin(), supp_end, out);
+        }
+    min_ball() {
+        for (int i = 0; i <= dim; ++i) {
+            c[i].resize(dim, 0);
+            v[i].resize(dim, 0);
+        }
+    }
+private:
+    list<point> ps;
+    list<point>::iterator supp_end;
+    int m;
+    point v[dim+1], c[dim+1];
+    number z[dim+1], r[dim+1];
+    void pop() { --m; }
+    void push(const point& p) {
+        if (m == 0) {
+            c[0] = p; r[0] = 0;
+        } else {
+            number e = dist2(p, c[m-1]) - r[m-1];
+            point delta = p - c[0];
+            v[m] = p - c[0];
+            for (int i = 1; i < m; ++i)
+                v[m] -= v[i] * dot(v[i], delta) / z[i];
+            z[m] = dot(v[m], v[m]);
+            c[m] = c[m-1] + e*v[m]/z[m]/2;
+            r[m] = r[m-1] + e*e/z[m]/4;
+        }
+        center  = c[m];
+        radius2 = r[m]; ++m;
+    }
+    void make_ball(list<point>::iterator i) {
+        supp_end = ps.begin();
+        if (m == dim + 1) return;
+        for (list<point>::iterator k = ps.begin(); k != i; ) {
+            list<point>::iterator j = k++;
+            if (dist2(*j, center) > radius2) {
+                push(*j); make_ball(j); pop();
+                move_to_front(j);
+            }
+        }
+    }
+    void move_to_front(list<point>::iterator j) {
+        if (supp_end == j) ++supp_end;
+        ps.splice (ps.begin(), ps, j);
+    }
+};

@@ -963,22 +963,21 @@ vector<ll> list_mod_inverse(ll until, ll mod)
 
 // a[i] * x == b[i] (mod m[i])
 // return (b, m) | (0, -1); // unsolvable
-pair<int, int> linear_congruence(const vector<int>& A, const vector<int>& B, const vector<int>& M)
+pair<ll, ll> linear_congruence(const vector<ll>& A, const vector<ll>& B, const vector<ll>& M)
 {
-    int x = 0, m = 1;
+    ll x = 0, m = 1;
     for (int i = 0; i < (int)A.size(); ++i)
     {
-        int a = A[i] * m,  b = B[i] - A[i] * x, d = __gcd(M[i], a);
+        ll a = A[i] * m,  b = B[i] - A[i] * x, d = __gcd(M[i], a);
         if (b % d != 0)
             return make_pair(0, -1); // unsolvable
-        int t = b / d * mod_inverse(a / d, M[i] / d) % (M[i] / d);
+        ll t = b / d * mod_inverse(a / d, M[i] / d) % (M[i] / d);
         x = x + m * t;
         m *= M[i] / d;
         x = (x + m) % m;
     }
     return make_pair(x % m, m);
 }
-
 
 /////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////
@@ -1651,6 +1650,69 @@ public:
                 d = min(d, g[prevv[i]][preve[i]].cap);
             _f -= d;
             res += d * h[t];
+            for (int i = t; i != s; i = prevv[i])
+            {
+                PrimalDualEdge& e = g[prevv[i]][preve[i]];
+                e.cap -= d;
+                g[e.to][e.rev].cap += d;
+            }
+        }
+
+        return res;
+    }
+
+    COST min_cost_flow_spfa(int s, int t, FLOW f)
+    {
+        COST res = 0;
+        int _f = f;
+        while (_f > 0)
+        {
+            const COST _INF = (COST)((1LL << 60) | (1 << 29));
+            vector<COST> dis(V, _INF);
+            vector<int> prevv(V), preve(V);
+
+            vector<bool> in_q(V);
+            queue<int> q;
+            dis[s] = 0;
+            q.push(s);
+            in_q[s] = true;
+
+            while (!q.empty())
+            {
+                int v = q.front(); q.pop();
+                COST cost = dis[v];
+                in_q[v] = false;
+
+                for (int i = 0; i < g[v].size(); ++i)
+                {
+                    PrimalDualEdge& e = g[v][i];
+                    const COST _eps = 1e-10;
+                    COST c = cost + e.cost;
+                    if (e.cap > 0 && c + _eps < dis[e.to])
+                    {
+                        dis[e.to] = c;
+                        prevv[e.to] = v;
+                        preve[e.to] = i;
+                        if (!in_q[e.to])
+                        {
+                            q.push(e.to);
+                            in_q[e.to] = true;
+                        }
+                    }
+                }
+            }
+
+            if (dis[t] == _INF)
+            {
+                // cant flow _f
+                return -_INF;
+            }
+
+            FLOW d = _f;
+            for (int i = t; i != s; i = prevv[i])
+                d = min(d, g[prevv[i]][preve[i]].cap);
+            _f -= d;
+            res += d * dis[t];
             for (int i = t; i != s; i = prevv[i])
             {
                 PrimalDualEdge& e = g[prevv[i]][preve[i]];
@@ -3499,4 +3561,324 @@ int diameter(int s, const vector<vector<int>>& g)
     pint r = dfs(s, -1, g);
     pint t = dfs(r.second, -1, g);
     return t.first;
+}
+
+// weighted
+typedef ll Weight;
+typedef pair<Weight, int> P;
+P visit(int p, int v, const vector<vector<P>>& g)
+{
+    P r(0, v);
+    for (auto& e : g[v])
+    {
+        if (e.second != p)
+        {
+            P t = visit(v, e.second, g);
+            t.first += e.first;
+            if (r.first < t.first)
+                r = t;
+        }
+    }
+    return r;
+}
+Weight diameter(const vector<vector<P>>& g, int s = 0)
+{
+    P r = visit(-1, s, g);
+    P t = visit(-1, r.second, g);
+    return t.first; // (r.second, t.second) is farthest pair
+}
+
+
+template <typename T>
+class Sum2d 
+{
+public:
+    int width, height;
+    vector<vector<T>> cum;
+    Sum2d(const vector<vector<T>>& a)
+        : width(a[0].size()), height(a.size()), cum(height + 1, vector<T>(width + 1))
+    {
+        for (int y = 0; y < height; ++y)
+            for (int x = 0; x < width; ++x)
+                cum[y + 1][x + 1] = cum[y][x + 1] + cum[y + 1][x] - cum[y][x] + a[y][x];
+    }
+    Sum2d() {}
+
+    T get_sum(int x, int y, int w, int h) const
+    {
+        assert(0 <= x && x + w <= width);
+        assert(0 <= y && y + h <= height);
+        return cum[y + h][x + w] - cum[y][x + w] - cum[y + h][x] + cum[y][x];
+    }
+};
+
+int gcd(int a, int b) { return __gcd(a, b); }
+class GcdSegTree
+{
+public:
+    GcdSegTree(int n)
+    {
+        m = 1;
+        while (m < n)
+            m *= 2;
+        a.resize(2 * m);
+    }
+ 
+    void update(int i, int v)
+    {
+        int k = i + m - 1;
+        a[k] = abs(v);
+        while (k > 0)
+        {
+            k = (k - 1) / 2;
+            a[k] = gcd(a[2 * k + 1], a[2 * k + 2]);
+        }
+    }
+ 
+    int query(int l, int r)
+    {
+        return query(l, r, 0, 0, m);
+    }
+ 
+private:
+    int query(int l, int r, int k, int p, int q)
+    {
+        if (l <= p && q <= r)
+            return a[k];
+        else if (r <= p || q <= l)
+            return 0;
+        else
+        {
+            int mid = (p + q) / 2;
+            return gcd(query(l, r, 2 * k + 1, p, mid), query(l, r, 2 * k + 2, mid, q));
+        }
+    }
+ 
+    int m;
+    vector<int> a;
+};
+
+
+
+namespace Treap
+{
+typedef int Value;
+
+struct Node
+{
+    Node(Value val)
+        :
+            size(1), priority(rand()), left(nullptr), right(nullptr),
+            val(val),
+            rev(false)
+    {
+    }
+    Node()
+        :
+            size(1), priority(rand()), left(nullptr), right(nullptr),
+            rev(false)
+    {
+    }
+
+    int size;
+    int priority;
+
+    Node* left;
+    Node* right;
+
+    Value val;
+
+    // lazy
+    bool rev;
+};
+
+int size(Node* t)
+{
+    return t ? t->size : 0;
+}
+
+Node* update(Node* t)
+{
+    t->size = size(t->left) + size(t->right) + 1;
+
+    return t;
+}
+
+void push(Node* t)
+{
+    if (!t)
+        return;
+
+    if (t->rev)
+    {
+        t->rev = false;
+
+        swap(t->left, t->right);
+        if (t->left)
+            t->left->rev ^= true;
+        if (t->right)
+            t->right->rev ^= true;
+    }
+}
+void reverse(Node* t)
+{
+    if (!t)
+        return;
+
+    t->rev ^= true;
+}
+
+
+Node* merge(Node* l, Node* r)
+{
+    if (!l)
+        return r;
+    else if (!r)
+        return l;
+
+    push(l);
+    push(r);
+
+    if (l->priority > r->priority)
+    {
+        l->right = merge(l->right, r);
+        return update(l);
+    }
+    else
+    {
+        r->left = merge(l, r->left);
+        return update(r);
+    }
+}
+
+// [0, k), (k, n)
+pair<Node*, Node*> split(Node* t, int k)
+{
+    assert(0 <= k && k <= size(t));
+
+    if (!t)
+        return make_pair(nullptr, nullptr);
+
+    push(t);
+
+    if (k <= size(t->left))
+    {
+        auto s = split(t->left, k);
+        t->left = s.second;
+        return make_pair(s.first, update(t));
+    }
+    else
+    {
+        auto s = split(t->right,  k - size(t->left) - 1);
+        t->right = s.first;
+        return make_pair(update(t), s.second);
+    }
+}
+
+// [0, k) + inserted + [k, n)
+Node* insert(Node* t, int k, Node* inserted)
+{
+    assert(0 <= k && k <= size(t));
+
+    auto s = split(t, k);
+    return merge(merge(s.first, inserted), s.second);
+}
+
+Node* erase(Node* t, int k)
+{
+    assert(0 <= k && k < size(t));
+
+    auto a = split(t, k);
+    auto b = split(a.second, 1);
+    delete b.first;
+    return merge(a.first, b.second);
+}
+
+Node* nth(Node* t, int n)
+{
+    assert(0 <= n && n < size(t));
+
+    push(t);
+
+    if (n < size(t->left))
+        return nth(t->left, n);
+    else if (n > size(t->left))
+        return nth(t->right, n - size(t->left) - 1);
+    else
+        return t;
+}
+
+// precondition: pos is acending
+vector<Node*> split(Node* t, const vector<int>& pos)
+{
+    vector<Node*> res(pos.size() + 1);
+    for (int i = (int)pos.size() - 1; i >= 0; --i)
+    {
+        auto s = split(t, pos[i]);
+        res[i + 1] = s.second;
+        t = s.first;
+    }
+    res[0] = t;
+    return res;
+}
+
+Node* merge(const vector<Node*>& ts)
+{
+    Node* root = nullptr;
+    for (auto t : ts)
+        root = merge(root, t);
+    return root;
+}
+
+} // namespace Treap
+
+using namespace Treap;
+bool same(vector<int> a, Node* root)
+{
+    assert(size(root) == (int)a.size());
+
+    rep(i, size(root))
+    {
+        if (nth(root, i)->val != a[i])
+        {
+//             printf("%4d: %d %d\n", i, a[i], nth(root, i)->val);
+            return false;
+        }
+    }
+    return true;
+}
+void test_treap()
+{
+    vector<int> a;
+    Node* root = nullptr;
+    rep(i, ten(3))
+    {
+        // insert
+        {
+            int k = rand() % (1 + size(root));
+            k = 0;
+            int val = i;
+
+            a.insert(a.begin() + k, val);
+            root = insert(root, k, new Node(val));
+
+            assert(same(a, root));
+        }
+
+        // reverse
+        rep(_, 100)
+        {
+            int l = rand() % size(root);
+            int r = l + rand() % (1 + size(root) - l);
+
+            reverse(a.begin() + l, a.begin() + r);
+
+            auto trees = split(root, {l, r});
+            reverse(trees[1]);
+            root = merge(trees);
+
+//             dump(a);
+            assert(same(a, root));
+        }
+    }
 }
