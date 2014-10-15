@@ -812,6 +812,18 @@ vector<vector<T> > combi_table(int n, int k, T mod)
     }
     return c;
 }
+template <class T>
+vector<vector<T> > combi_table(int n, int k)
+{
+    vector<vector<T> > c(n + 1, vector<T>(k + 1));
+    for (int i = 0; i <= n; ++i)
+    {
+        c[i][0] = 1;
+        for (int j = 1; j <= min(i, k); ++j)
+            c[i][j] = c[i - 1][j - 1] + c[i - 1][j];
+    }
+    return c;
+}
 
 
 ll combi(int n, int k)
@@ -3604,7 +3616,14 @@ public:
     }
     Sum2d() {}
 
-    T get_sum(int x, int y, int w, int h) const
+    T get_sum(int x1, int x2, int y1, int y2) const
+    {
+        assert(0 <= x1 && x1 <= x2 && x2 <= width);
+        assert(0 <= y1 && y1 <= y2 && y2 <= height);
+        return cum[y2][x2] - cum[y1][x2] - cum[y2][x1] + cum[y1][x1];
+    }
+
+    T get_sum_by_len(int x, int y, int w, int h) const
     {
         assert(0 <= x && x + w <= width);
         assert(0 <= y && y + h <= height);
