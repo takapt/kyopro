@@ -3679,7 +3679,7 @@ private:
 
 
 
-namespace Treap
+namespace RBST
 {
 typedef int Value;
 
@@ -3687,20 +3687,19 @@ struct Node
 {
     Node(Value val)
         :
-            size(1), priority(rand()), left(nullptr), right(nullptr),
+            size(1), left(nullptr), right(nullptr),
             val(val),
             rev(false)
     {
     }
     Node()
         :
-            size(1), priority(rand()), left(nullptr), right(nullptr),
+            size(1), left(nullptr), right(nullptr),
             rev(false)
     {
     }
 
     int size;
-    int priority;
 
     Node* left;
     Node* right;
@@ -3758,7 +3757,7 @@ Node* merge(Node* l, Node* r)
     push(l);
     push(r);
 
-    if (l->priority > r->priority)
+    if (rand() % (size(l) + size(r)) < size(l))
     {
         l->right = merge(l->right, r);
         return update(l);
@@ -3849,9 +3848,10 @@ Node* merge(const vector<Node*>& ts)
     return root;
 }
 
-} // namespace Treap
+} // namespace RBST
 
-using namespace Treap;
+
+using namespace RBST;
 bool same(vector<int> a, Node* root)
 {
     assert(size(root) == (int)a.size());
@@ -3866,7 +3866,7 @@ bool same(vector<int> a, Node* root)
     }
     return true;
 }
-void test_treap()
+void test_rbst()
 {
     vector<int> a;
     Node* root = nullptr;
