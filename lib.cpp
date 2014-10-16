@@ -1929,7 +1929,7 @@ private:
     int max_log;
 
     LCA(vector<int>& depth, vector<vector<int> >& parent, int max_log)
-        : depth(depth), parent(parent), max_log(max_log) { }
+        : max_log(max_log), depth(depth), parent(parent) { }
 
 public:
     vector<int> depth;
@@ -1972,7 +1972,7 @@ private:
     vector<vector<int> > parent;
 
     LCABuilder(vector<vector<int> >& graph, int root)
-        : g(graph), n(graph.size()), depth(n), root(root)
+        : root(root), n(graph.size()), g(graph), depth(n)
     {
         max_log = 0;
         for (int i = 1; i <= n; i *= 2)
@@ -1987,7 +1987,7 @@ private:
         parent[0][v] = p;
         depth[v] = d;
 
-        for (int i = 0; i < g[v].size(); ++i)
+        for (int i = 0; i < (int)g[v].size(); ++i)
             if (g[v][i] != p)
                 calc_depth(g[v][i], v, d + 1);
     }
@@ -3681,6 +3681,9 @@ private:
 
 namespace RBST
 {
+// #define RBST_LAZY
+// #define RBST_REV
+
 typedef int Value;
 
 struct Node
@@ -3688,14 +3691,18 @@ struct Node
     Node(Value val)
         :
             size(1), left(nullptr), right(nullptr),
-            val(val),
-            rev(false)
+            val(val)
+#ifdef RBST_REV
+            , rev(false)
+#endif
     {
     }
     Node()
         :
-            size(1), left(nullptr), right(nullptr),
-            rev(false)
+            size(1), left(nullptr), right(nullptr)
+#ifdef RBST_REV
+            , rev(false)
+#endif
     {
     }
 
@@ -3707,7 +3714,9 @@ struct Node
     Value val;
 
     // lazy
+#ifdef RBST_REV
     bool rev;
+#endif
 };
 
 int size(Node* t)
@@ -3724,9 +3733,11 @@ Node* update(Node* t)
 
 void push(Node* t)
 {
+#ifdef RBST_LAZY
     if (!t)
         return;
 
+#ifdef RBST_REV
     if (t->rev)
     {
         t->rev = false;
@@ -3737,7 +3748,12 @@ void push(Node* t)
         if (t->right)
             t->right->rev ^= true;
     }
+#endif
+
+#endif
 }
+
+#ifdef RBST_REV
 void reverse(Node* t)
 {
     if (!t)
@@ -3745,6 +3761,7 @@ void reverse(Node* t)
 
     t->rev ^= true;
 }
+#endif
 
 
 Node* merge(Node* l, Node* r)
@@ -3848,6 +3865,110 @@ Node* merge(const vector<Node*>& ts)
     return root;
 }
 
+void _list_val(Node* t, vector<Value>& val)
+{
+    if (!t)
+        return;
+
+    _list_val(t->left, val);
+    _list_val(t->right, val);
+
+    val.push_back(t->val);
+}
+vector<int> list_val(Node* root)
+{
+    vector<Value> val;
+    _list_val(root, val);
+    return val;
+}
+
+int lower_bound_index(Node* t, Value val)
+{
+    if (!t)
+        return 0;
+
+    if (val <= t->val)
+        return lower_bound_index(t->left, val);
+    else
+        return size(t->left) + 1 + lower_bound_index(t->right, val);
+}
+int upper_bound_index(Node* t, Value val)
+{
+    if (!t)
+        return 0;
+
+    if (val < t->val)
+        return upper_bound_index(t->left, val);
+    else
+        return size(t->left) + 1 + upper_bound_index(t->right, val);
+}
+
+Node* ordered_insert(Node* t, Node* inserted)
+{
+    return insert(t, lower_bound_index(t, inserted->val), inserted);
+}
+
+
+// persistent
+Node* persistent_merge(Node* l, Node* r)
+{
+    if (!l)
+        return r;
+    else if (!r)
+        return l;
+
+    if (rand() % (size(l) + size(r)) < size(l))
+    {
+        Node* copied_l = new Node(*l);
+        copied_l->right = persistent_merge(copied_l->right, r);
+        return update(copied_l);
+    }
+    else
+    {
+        Node* copied_r = new Node(*r);
+        copied_r->left = persistent_merge(l, copied_r->left);
+        return update(copied_r);
+    }
+}
+
+// [0, k), (k, n)
+pair<Node*, Node*> persistent_split(Node* t, int k)
+{
+    assert(0 <= k && k <= size(t));
+
+    if (!t)
+        return make_pair(nullptr, nullptr);
+
+    Node* copied_t = new Node(*t);
+    if (k <= size(t->left))
+    {
+        auto s = persistent_split(copied_t->left, k);
+        copied_t->left = s.second;
+        return make_pair(s.first, update(copied_t));
+    }
+    else
+    {
+        auto s = persistent_split(copied_t->right,  k - size(copied_t->left) - 1);
+        copied_t->right = s.first;
+        return make_pair(update(copied_t), s.second);
+    }
+}
+
+// [0, k) + inserted + [k, n)
+Node* persistent_insert(Node* t, int k, Node* inserted)
+{
+    assert(0 <= k && k <= size(t));
+
+    auto s = persistent_split(t, k);
+    return persistent_merge(persistent_merge(s.first, inserted), s.second);
+}
+
+Node* persistent_ordered_insert(Node* t, Node* inserted)
+{
+    return persistent_insert(t, lower_bound_index(t, inserted->val), inserted);
+}
+
+
 } // namespace RBST
 
 
@@ -3884,20 +4005,72 @@ void test_rbst()
             assert(same(a, root));
         }
 
+#ifdef RBST_REV
         // reverse
-        rep(_, 100)
-        {
-            int l = rand() % size(root);
-            int r = l + rand() % (1 + size(root) - l);
+//         rep(_, 100)
+//         {
+//             int l = rand() % size(root);
+//             int r = l + rand() % (1 + size(root) - l);
+//
+//             reverse(a.begin() + l, a.begin() + r);
+//
+//             auto trees = split(root, {l, r});
+//             reverse(trees[1]);
+//             root = merge(trees);
+//
+// //             dump(a);
+//             assert(same(a, root));
+//         }
+#endif
+    }
+}
+void test_ordered_rbst()
+{
+    vector<int> a;
+    Node* root = nullptr;
 
-            reverse(a.begin() + l, a.begin() + r);
+    rep(_, ten(5))
+    {
+        int val = (rand() % ten(5));
+        val = _;
 
-            auto trees = split(root, {l, r});
-            reverse(trees[1]);
-            root = merge(trees);
+//         int low_i = lower_bound(all(a), val) - a.begin();
+//         int up_i = upper_bound(all(a), val) - a.begin();
 
-//             dump(a);
-            assert(same(a, root));
-        }
+//         assert(lower_bound_index(root, val) == low_i);
+//         assert(upper_bound_index(root, val) == up_i);
+
+
+//         a.push_back(val);
+//         sort(all(a));
+
+        root = ordered_insert(root, new Node(val));
+    }
+
+    dump(nth(root, size(root) / 2)->val);
+}
+
+void test_persistent()
+{
+    vector<vector<int>> hist_a = {{}};
+    vector<Node*> hist_root = {nullptr};
+
+    rep(i, ten(2))
+    {
+        int k = rand() % (1 + size(hist_root.back()));
+        int val = i;
+
+        auto a = hist_a.back();
+        a.insert(a.begin() + k, val);
+
+        auto root = persistent_insert(hist_root.back(), k, new Node(val));
+
+        assert(same(a, root));
+
+        hist_a.push_back(a);
+        hist_root.push_back(root);
+
+        rep(j, hist_a.size())
+            assert(same(hist_a[j], hist_root[j]));
     }
 }
