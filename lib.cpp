@@ -1442,7 +1442,7 @@ class Dinic
         int rev;
         DinicEdge(int to, T cap, int rev)
             : to(to), cap(cap), rev(rev) {}
-        DinicEdge() { DinicEdge(0, 0, 0); }
+        DinicEdge() {}
     };
 
 
