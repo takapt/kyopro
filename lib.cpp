@@ -4074,3 +4074,109 @@ void test_persistent()
             assert(same(hist_a[j], hist_root[j]));
     }
 }
+
+
+class HLDecomposition
+{
+public:
+    int n;
+
+    vector<int> depth, par;
+
+    vector<int> cluster; // cluster[v] -> vの属するcluster_i
+    vector<vector<int>> paths; // paths[cluster_i] -> path, path: 上から下順
+    vector<int> index_in_path;
+
+    HLDecomposition(){};
+
+    HLDecomposition(const vector<vector<int>>& g, int root)
+        : n(g.size()), depth(n), par(n), cluster(n, -1), index_in_path(n)
+    {
+        vector<int> bfs_order(n);
+
+        // order
+        {
+            depth[root] = 0;
+            par[root] = -1;
+            bfs_order[0] = root;
+            for (int p = 0, r = 1; p < r; ++p)
+            {
+                int cur = bfs_order[p];
+                for (int next : g[cur])
+                {
+                    if (next != par[cur])
+                    {
+                        bfs_order[r++] = next;
+                        par[next] = cur;
+                        depth[next] = depth[cur] + 1;
+                    }
+                }
+            }
+        }
+
+        // decomposition
+        {
+            vector<int> subtree_size(n, 1);
+            for (int i = n - 1; i > 0; --i)
+                subtree_size[par[bfs_order[i]]] += subtree_size[bfs_order[i]];
+
+            int cluster_i = 0;
+            for (int i = 0; i < n; ++i)
+            {
+                int u = bfs_order[i];
+                if (cluster[u] == -1)
+                    cluster[u] = cluster_i++;
+
+                bool found = false;
+                for (int v : g[u])
+                {
+                    if (par[u] != v && subtree_size[v] >= subtree_size[u] / 2)
+                    {
+                        cluster[v] = cluster[u];
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    for (int v : g[u])
+                    {
+                        if (par[u] != v)
+                        {
+                            cluster[v] = cluster[u];
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // path
+        {
+            int cluster_num = 0;
+            vector<int> path_len(n);
+            for (int i = 0; i < n; ++i)
+            {
+                ++path_len[cluster[i]];
+                cluster_num = max(cluster_num, cluster[i]);
+            }
+            ++cluster_num;
+
+            paths.resize(cluster_num);
+            for (int i = 0; i < cluster_num; ++i)
+                paths[i].resize(path_len[i]);
+
+            for (int i = n - 1; i >= 0; --i)
+            {
+                int u = bfs_order[i];
+                paths[cluster[u]][--path_len[cluster[u]]] = u;
+            }
+
+            for (vector<int>& path : paths)
+            {
+                for (int i = 0; i < (int)path.size(); ++i)
+                    index_in_path[path[i]] = i;
+            }
+        }
+    }
+};
