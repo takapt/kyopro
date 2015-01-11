@@ -3683,8 +3683,10 @@ namespace RBST
 {
 // #define RBST_LAZY
 // #define RBST_REV
+#define RBST_SUM_VAL
 
 typedef int Value;
+typedef ll SumValue;
 
 struct Node
 {
@@ -3694,6 +3696,9 @@ struct Node
             val(val)
 #ifdef RBST_REV
             , rev(false)
+#endif
+#ifdef RBST_SUM_VAL
+            , sum_val(val)
 #endif
     {
     }
@@ -3713,6 +3718,10 @@ struct Node
 
     Value val;
 
+#ifdef RBST_SUM_VAL
+    SumValue sum_val;
+#endif
+
     // lazy
 #ifdef RBST_REV
     bool rev;
@@ -3724,9 +3733,20 @@ int size(Node* t)
     return t ? t->size : 0;
 }
 
+#ifdef RBST_SUM_VAL
+SumValue sum_val(Node* t)
+{
+    return t ? t->sum_val : 0;
+}
+#endif
+
 Node* update(Node* t)
 {
     t->size = size(t->left) + size(t->right) + 1;
+
+#ifdef RBST_SUM_VAL
+    t->sum_val = t->val + sum_val(t->left) + sum_val(t->right);
+#endif
 
     return t;
 }
