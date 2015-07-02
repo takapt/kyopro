@@ -2778,33 +2778,96 @@ public:
     }
 };
 
-// Timer (タイマ)
+ull rdtsc()
+{
+#ifdef __amd64
+    ull a, d;
+    __asm__ volatile ("rdtsc" : "=a" (a), "=d" (d)); 
+    return (d<<32) | a;
+#else
+    ull x;
+    __asm__ volatile ("rdtsc" : "=A" (x)); 
+    return x;
+#endif
+}
+#ifdef LOCAL
+const double CYCLES_PER_SEC = 3.30198e9;
+#else
+const double CYCLES_PER_SEC = 2.5e9;
+#endif
+double get_absolute_sec()
+{
+    return (double)rdtsc() / CYCLES_PER_SEC;
+}
 #ifdef _MSC_VER
 #include <Windows.h>
+    double get_ms() { return (double)GetTickCount64() / 1000; }
 #else
 #include <sys/time.h>
+    double get_ms() { struct timeval t; gettimeofday(&t, NULL); return (double)t.tv_sec * 1000 + (double)t.tv_usec / 1000; }
 #endif
+
+#define USE_RDTSC
 class Timer
 {
-    typedef double time_type;
-    typedef unsigned int skip_type;
-
 private:
-    time_type start_time;
-    time_type elapsed;
+    double start_time;
+    double elapsed;
 
-#ifdef _MSC_VER
-    time_type get_ms() { return (time_type)GetTickCount64() / 1000; }
+#ifdef USE_RDTSC
+    double get_sec() { return get_absolute_sec(); }
 #else
-    time_type get_ms() { struct timeval t; gettimeofday(&t, NULL); return (time_type)t.tv_sec * 1000 + (time_type)t.tv_usec / 1000; }
+    double get_sec() { return get_ms() / 1000; }
 #endif
 
 public:
     Timer() {}
 
-    void start() { start_time = get_ms(); }
-    time_type get_elapsed() { return elapsed = get_ms() - start_time; }
+    void start() { start_time = get_sec(); }
+    double get_elapsed() { return elapsed = get_sec() - start_time; }
 };
+
+void calc_cycles_per_sec()
+{
+    Timer timer;
+    timer.start();
+
+    ull start_rdtsc = rdtsc();
+    double start = get_ms();
+    int loops = 0;
+    const double LOOP_SEC = 100;
+    while (get_ms() - start < LOOP_SEC * 1000)
+        ++loops;
+    dump(loops);
+    ull end_rdtsc = rdtsc();
+    dump(start_rdtsc);
+    dump(end_rdtsc);
+    cerr << "CYCLES_PER_SEC = " << (end_rdtsc - start_rdtsc) / LOOP_SEC << endl;
+
+    dump(timer.get_elapsed());
+}
+void count_timeof_call()
+{
+    double start = get_ms();
+    int loops = 0;
+    const double LOOP_SEC = 10;
+    while (get_ms() - start < LOOP_SEC * 1000)
+        ++loops;
+    dump(loops);
+    cerr << "timeof calls / sec = " << loops / LOOP_SEC << endl;
+}
+void count_rdtsc_call()
+{
+    cerr << "rdtsc" << endl;
+    double start = get_absolute_sec();
+    int loops = 0;
+    const double LOOP_SEC = 10;
+    while (get_absolute_sec() - start < LOOP_SEC)
+        ++loops;
+    dump(loops);
+    cerr << "rdtsc calls / sec = " << loops / LOOP_SEC << endl;
+}
+
 
 // サイコロ
 enum Face { TOP, BOTTOM, FRONT, BACK, LEFT, RIGHT };
