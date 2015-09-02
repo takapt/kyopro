@@ -2738,7 +2738,7 @@ public:
              , unsigned int z
              , unsigned int w)
         : x(x), y(y), z(z), w(w) { }
-    Random() 
+    Random()
         : x(123456789), y(362436069), z(521288629), w(88675123) { }
     Random(unsigned int seed)
         : x(123456789), y(362436069), z(521288629), w(seed) { }
@@ -2757,8 +2757,8 @@ public:
     // [0, upper)
     int next_int(int upper) { return next() % upper; }
 
-    // [low, high]
-    int next_int(int low, int high) { return next_int(high - low + 1) + low; }
+    // [low, high)
+    int next_int(int low, int high) { return next_int(high - low) + low; }
 
     double next_double(double upper) { return upper * next() / UINT_MAX; }
     double next_double(double low, double high) { return next_double(high - low) + low; }
@@ -2767,14 +2767,14 @@ public:
     int select(const vector<T>& ratio)
     {
         T sum = accumulate(ratio.begin(), ratio.end(), (T)0);
-        T v = next_double(sum) + (T)1e-6;
+        double v = next_double(sum) + 1e-6;
         for (int i = 0; i < (int)ratio.size(); ++i)
         {
             v -= ratio[i];
             if (v <= 0)
                 return i;
         }
-        return 0;
+        return (int)ratio.size() - 1;
     }
 };
 
