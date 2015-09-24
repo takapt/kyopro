@@ -4263,3 +4263,101 @@ public:
         }
     }
 };
+
+
+typedef unsigned long long ull;
+const ull mod = ten(9) + 7;
+class MulSeg
+{
+public:
+    MulSeg(int n_, ull base) : n(1)
+    {
+        while (n < n_)
+            n *= 2;
+        data.resize(2 * n, Node{0, -1});
+        base_pow.resize(n + 1);
+        sum_base_pow.resize(n + 1);
+
+        base_pow[0] = 1;
+        for (int i = 0; i < n; ++i)
+        {
+            base_pow[i + 1] = base * base_pow[i] % mod;
+            sum_base_pow[i + 1] = (sum_base_pow[i] + base_pow[i]) % mod;
+        }
+    }
+
+    void update(int x, int a, int b)
+    {
+        update(x, 0, a, b, 0, n);
+    }
+
+    ull query(int a, int b)
+    {
+        return query(0, a, b, 0, n);
+    }
+
+private:
+    void update(int x, int k, int a, int b, int l, int r)
+    {
+        if (b <= l || r <= a)
+            return;
+        else if (a <= l && r <= b)
+        {
+            data[k].hash = x * sum_base_pow[r - l] % mod;
+            data[k].lazy = x;
+            return;
+        }
+
+        assert(r - l > 1);
+
+        propagate(k, l, r);
+
+        int mid = (l + r) / 2;
+        update(x, 2 * k + 1, a, b, l, mid);
+        update(x, 2 * k + 2, a, b, mid, r);
+
+        data[k].hash = (data[2 * k + 1].hash * base_pow[(r - l) / 2] + data[2 * k + 2].hash) % mod;
+
+        assert(data[k].lazy == -1);
+    }
+
+    void propagate(int k, int l, int r)
+    {
+        if (data[k].lazy == -1 || r - l == 1)
+            return;
+
+        auto& left = data[2 * k + 1];
+        auto& right = data[2 * k + 2];
+        left.hash = right.hash = data[k].lazy * sum_base_pow[(r - l) / 2] % mod;
+        left.lazy = right.lazy = data[k].lazy;
+
+        data[k].lazy = -1;
+    }
+
+    ull query(int k, int a, int b, int l, int r)
+    {
+        if (b <= l || r <= a)
+            return 0;
+        else if (a <= l && r <= b)
+            return data[k].hash;
+
+        propagate(k, l, r);
+
+        int mid = (l + r) / 2;
+
+        ull left_hash = query(2 * k + 1, a, b, l, mid);
+        ull right_hash = query(2 * k + 2, a, b, mid, r);
+        return (left_hash * base_pow[max(0, min(r, b) - mid)] + right_hash) % mod;
+    }
+
+    struct Node
+    {
+        ull hash;
+        int lazy;
+    };
+    int n;
+    vector<Node> data;
+
+    vector<ull> base_pow;
+    vector<ull> sum_base_pow;
+};
