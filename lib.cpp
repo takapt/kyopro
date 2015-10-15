@@ -4168,7 +4168,32 @@ public:
 
     vector<int> cluster; // cluster[v] -> vの属するcluster_i
     vector<vector<int>> paths; // paths[cluster_i] -> path, path: 上から下順
-    vector<int> index_in_path;
+    vector<int> index_in_path; // [v]
+
+    typedef function<void(int, int ,int)> Callback; // (cluster_i, path_up_i, path_down_i), [up, down)
+    // from, to (inclusive)
+    void up(int from, int to, Callback callback)
+    {
+        assert(depth[from] >= depth[to]);
+
+        int v = from;
+        while (cluster[v] != cluster[to])
+        {
+            callback(cluster[v], 0, index_in_path[v] + 1);
+            v = par[path(v)[0]];
+        }
+        assert(cluster[v] == cluster[to]);
+
+        callback(cluster[v], index_in_path[to], index_in_path[v] + 1);
+
+        return;
+    }
+
+    const vector<int>& path(int v) const
+    {
+        assert(0 <= v && v < n);
+        return paths[cluster[v]];
+    }
 
     HLDecomposition(){};
 
@@ -4361,3 +4386,80 @@ private:
     vector<ull> base_pow;
     vector<ull> sum_base_pow;
 };
+
+
+
+const int MAX_SIZE = 10;
+vector<int> sorted_merge(const vector<int>& left, const vector<int>& right)
+{
+    vector<int> a;
+    const int m = min<int>(MAX_SIZE, left.size() + right.size());
+    a.reserve(m);
+    int i = 0, j = 0;
+    while (a.size() < m)
+    {
+        if (i < left.size() && (j == right.size() || left[i] <= right[j]))
+        {
+            assert(i < left.size());
+            a.push_back(left[i++]);
+        }
+        else
+        {
+            assert(j < right.size());
+            a.push_back(right[j++]);
+        }
+    }
+    return move(a);
+}
+class SortedSeg
+{
+public:
+    SortedSeg(const vector<vector<int>>& a)
+    {
+        n = 1;
+        while (n < a.size())
+            n *= 2;
+        data.resize(2 * n);
+
+        rep(i, a.size())
+        {
+            assert(i + n - 1 < data.size());
+            data[i + n - 1] = a[i];
+        }
+
+        if (a.size() <= 1)
+            return;
+
+        for (int k = n - 2; k >= 0; --k)
+        {
+            assert(2 * k + 1 < data.size());
+            assert(2 * k + 2 < data.size());
+            data[k] = move(sorted_merge(data[2 * k + 1], data[2 * k + 2]));
+        }
+    }
+
+    vector<int> query(int a, int b)
+    {
+        return move(query(a, b, 0, 0, n));
+    }
+
+private:
+    vector<int> query(int a, int b, int k, int l, int r)
+    {
+        if (r <= a || b <= l)
+            return {};
+
+        if (a <= l && r <= b)
+            return data[k];
+        else
+        {
+            int mid = (l + r) / 2;
+            auto left = query(a, b, 2 * k + 1, l, mid);
+            auto right = query(a, b, 2 * k + 2, mid, r);
+            return move(sorted_merge(left, right));
+        }
+    }
+
+    int n;
+    vector<vector<int>> data;
+}
